@@ -14,7 +14,8 @@ const config = require('./config');
 
 // Decide at module load time whether to use real GPIO or the mock.
 // This avoids sprinkling if/else checks throughout every function.
-const MOCK = process.env.MOCK_GPIO === 'true' || !isRaspberryPi();
+// Note: MOCK may be upgraded to true inside init() if the hardware init fails.
+let MOCK = process.env.MOCK_GPIO === 'true' || !isRaspberryPi();
 
 /**
  * Detects whether this process is running on a Raspberry Pi by checking
@@ -48,14 +49,23 @@ function init() {
     console.log('[GPIO] Mock mode — no hardware access');
     return;
   }
-  const { Gpio } = require('onoff');
-  // "Off" value depends on relay polarity — see config.activeHigh explanation.
-  const offValue = config.activeHigh ? 0 : 1;
-  for (const zone of config.zones) {
-    gpioObjects[zone.pin] = new Gpio(zone.pin, 'out'); // configure pin as output
-    gpioObjects[zone.pin].writeSync(offValue);          // ensure relay starts closed
+  try {
+    const { Gpio } = require('onoff');
+    const offValue = config.activeHigh ? 0 : 1;
+    for (const zone of config.zones) {
+      gpioObjects[zone.pin] = new Gpio(zone.pin, 'out');
+      gpioObjects[zone.pin].writeSync(offValue);
+    }
+    console.log('[GPIO] Initialized, all zones off');
+  } catch (err) {
+    // GPIO access failed — most likely the user isn't in the 'gpio' group yet.
+    // Fall back to mock mode so the server still starts and the UI works.
+    // Fix: run  sudo usermod -aG gpio $USER  then reboot, then restart the server.
+    MOCK = true;
+    console.warn('[GPIO] Hardware init failed, falling back to mock mode.');
+    console.warn('[GPIO] To enable real GPIO: sudo usermod -aG gpio $USER  then reboot.');
+    console.warn('[GPIO] Error was:', err.message);
   }
-  console.log('[GPIO] Initialized, all zones off');
 }
 
 /**
