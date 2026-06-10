@@ -138,19 +138,21 @@ export default function Sprinklers({
         </div>
       )}
 
-      {/* Tab bar — segmented control */}
-      <div className="bg-slate-800/70 border border-slate-700/60 rounded-xl p-1 flex mb-5">
+      {/* Tab bar — segmented control. Icon stacked above the label so four
+          tabs fit comfortably on a phone without the text feeling cramped. */}
+      <div className="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-1.5 flex gap-1 mb-5">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all ${
               tab === id
-                ? 'bg-gradient-to-r from-cyan-500 to-sky-500 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-gradient-to-b from-cyan-500 to-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
-            <Icon className="w-3.5 h-3.5" /> {label}
+            <Icon className="w-4 h-4" />
+            {label}
           </button>
         ))}
       </div>
