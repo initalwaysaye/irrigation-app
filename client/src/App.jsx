@@ -2,183 +2,332 @@
  * App.jsx
  * Root component — owns all application state and coordinates data fetching.
  *
- * State:
- *   zones     - array of zone objects from GET /api/zones, polled every 10 seconds
- *   schedules - array of schedule objects from GET /api/schedules
- *   tab       - which tab is currently shown: 'zones' or 'schedules'
- *   modal     - controls the schedule modal:
- *                 null           = modal closed
- *                 {}             = modal open in "create" mode
- *                 { schedule: s} = modal open in "edit" mode with schedule s
+ * Tabs:
+ *   zones     - live zone control cards + "water all" / "stop all"
+ *   schedules - recurring schedule management with next-run preview
+ *   history   - log of past watering events
  *
- * Data flow:
- *   App fetches data and passes it down as props.
- *   Child components call API functions directly and pass results back up
- *   via callbacks (onUpdate, onSave etc.) so App can update its state.
- *   This keeps the single source of truth at the top level.
+ * Other state:
+ *   rainDelayUntil - ISO timestamp while a rain delay is active (schedules paused)
+ *   modal          - schedule modal: null (closed) | {} (create) | { schedule } (edit)
+ *   rainPanel      - whether the rain delay options panel is open
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import ZoneCard from './components/ZoneCard';
 import ScheduleModal from './components/ScheduleModal';
+import HistoryList from './components/HistoryList';
+import { Droplet, CloudRain, Calendar, History, Play, Stop } from './components/Icons';
 import {
-  fetchZones, fetchSchedules,
+  fetchZones, fetchSchedules, fetchLog, fetchStatus,
   createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
+  runAllZones, stopAllZones, setRainDelay, cancelRainDelay,
 } from './api';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const TABS = [
+  { id: 'zones',     label: 'Zones',     Icon: Droplet },
+  { id: 'schedules', label: 'Schedules', Icon: Calendar },
+  { id: 'history',   label: 'History',   Icon: History },
+];
+
+/**
+ * Works out when a schedule will next fire, scanning up to 8 days ahead.
+ * Returns a Date, or null if the schedule is disabled.
+ */
+function nextRun(s) {
+  if (!s.enabled) return null;
+  const [h, m] = s.start_time.split(':').map(Number);
+  const now = new Date();
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    d.setHours(h, m, 0, 0);
+    if (d <= now) continue;
+    if (!s.days.length || s.days.includes(d.getDay())) return d;
+  }
+  return null;
+}
+
+/** Formats a next-run Date as "Today 06:00", "Tomorrow 06:00", or "Mon 06:00". */
+function fmtNextRun(d) {
+  const now = new Date();
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const dayDiff = Math.round(
+    (new Date(d.getFullYear(), d.getMonth(), d.getDate()) -
+     new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000
+  );
+  if (dayDiff === 0) return `Today ${time}`;
+  if (dayDiff === 1) return `Tomorrow ${time}`;
+  return `${DAY_LABELS[d.getDay()]} ${time}`;
+}
+
 export default function App() {
   const [zones, setZones] = useState([]);
   const [schedules, setSchedules] = useState([]);
+  const [log, setLog] = useState([]);
+  const [rainDelayUntil, setRainDelayUntil] = useState(null);
   const [tab, setTab] = useState('zones');
   const [modal, setModal] = useState(null);
+  const [rainPanel, setRainPanel] = useState(false);
+  const [runAllDuration, setRunAllDuration] = useState(10);
 
-  // useCallback prevents these functions being recreated on every render,
-  // which would cause the useEffect dependency array to change and re-run the effect.
   const loadZones = useCallback(() => fetchZones().then(setZones), []);
   const loadSchedules = useCallback(() => fetchSchedules().then(setSchedules), []);
+  const loadLog = useCallback(() => fetchLog().then(setLog), []);
+  const loadStatus = useCallback(
+    () => fetchStatus().then(s => setRainDelayUntil(s.rainDelayUntil)), []
+  );
 
   useEffect(() => {
-    // Load both zones and schedules when the app first mounts.
     loadZones();
     loadSchedules();
-
-    // Poll zone state every 10 seconds so the UI reflects changes that happen
-    // automatically (scheduled runs starting/stopping) without needing a refresh.
-    // Schedules don't need polling — they only change when the user edits them.
-    const id = setInterval(loadZones, 10000);
-
-    // Clean up the interval when the component unmounts (prevents memory leaks).
+    loadLog();
+    loadStatus();
+    // Poll zones + status every 10s so scheduled runs and delay expiry show up
+    // without a refresh. Schedules/log reload on demand instead.
+    const id = setInterval(() => { loadZones(); loadStatus(); }, 10000);
     return () => clearInterval(id);
-  }, []); // empty dependency array = run once on mount
+  }, []);
 
-  /**
-   * Updates a single zone in the zones array without re-fetching all zones.
-   * Called by ZoneCard after a successful on/off API call — the server returns
-   * the updated zone object so we can apply it immediately for snappy UI feedback.
-   *
-   * @param {object} updated - the updated zone object returned by the API
-   */
+  // Refresh the history list whenever the user switches to that tab.
+  useEffect(() => { if (tab === 'history') loadLog(); }, [tab]);
+
   function updateZone(updated) {
     setZones(zs => zs.map(z => z.id === updated.id ? updated : z));
   }
 
-  /**
-   * Handles saving from the schedule modal — either creating or updating
-   * depending on whether form.id exists (edit mode) or not (create mode).
-   * Reloads the schedule list afterwards so the UI shows the saved state.
-   */
   async function handleSave(form) {
-    if (form.id) {
-      await updateSchedule(form.id, form);
-    } else {
-      await createSchedule(form);
-    }
-    setModal(null);      // close the modal
-    loadSchedules();     // refresh the list
+    if (form.id) await updateSchedule(form.id, form);
+    else await createSchedule(form);
+    setModal(null);
+    loadSchedules();
   }
 
-  /** Toggles enabled/disabled on a schedule and refreshes the list. */
   async function handleToggle(id) {
     await toggleSchedule(id);
     loadSchedules();
   }
 
-  /** Deletes a schedule after confirmation and refreshes the list. */
   async function handleDelete(id) {
     if (!confirm('Delete this schedule?')) return;
     await deleteSchedule(id);
     loadSchedules();
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
+  async function handleRunAll() {
+    setZones(await runAllZones(runAllDuration));
+  }
 
-      {/* Fixed header — stays visible when scrolling on mobile */}
-      <header className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900">Irrigation Control</h1>
+  async function handleStopAll() {
+    setZones(await stopAllZones());
+  }
+
+  async function handleRainDelay(hours) {
+    const s = await setRainDelay(hours);
+    setRainDelayUntil(s.rainDelayUntil);
+    setRainPanel(false);
+  }
+
+  async function handleCancelRain() {
+    await cancelRainDelay();
+    setRainDelayUntil(null);
+  }
+
+  const anyOn = zones.some(z => z.isOn);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-sky-50/50">
+
+      {/* Header — gradient banner with app title and rain delay button */}
+      <header className="bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-500 text-white sticky top-0 z-20 shadow-md">
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+            <Droplet className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold leading-tight">Irrigation</h1>
+            <p className="text-[11px] text-sky-100">
+              {anyOn ? 'Watering in progress' : 'All zones idle'}
+            </p>
+          </div>
+          {/* Rain delay toggle — highlighted while a delay is active */}
+          <button
+            onClick={() => setRainPanel(p => !p)}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+              rainDelayUntil ? 'bg-white text-sky-600' : 'bg-white/15 hover:bg-white/25'
+            }`}
+            aria-label="Rain delay"
+          >
+            <CloudRain className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Rain delay options panel */}
+        {rainPanel && (
+          <div className="max-w-lg mx-auto px-4 pb-4">
+            <div className="bg-white/10 rounded-xl p-3">
+              <p className="text-xs text-sky-100 mb-2">
+                Pause scheduled watering (manual runs still work):
+              </p>
+              <div className="flex gap-2">
+                {[24, 48, 72].map(h => (
+                  <button
+                    key={h}
+                    onClick={() => handleRainDelay(h)}
+                    className="flex-1 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    {h}h
+                  </button>
+                ))}
+                {rainDelayUntil && (
+                  <button
+                    onClick={() => { handleCancelRain(); setRainPanel(false); }}
+                    className="flex-1 py-1.5 bg-white text-sky-700 rounded-lg text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Tab bar — switches between zone controls and schedule management */}
-      <nav className="bg-white border-b border-gray-200 flex">
-        {['zones', 'schedules'].map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-3 text-sm font-medium capitalize transition-colors ${
-              tab === t
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      {/* Active rain delay banner */}
+      {rainDelayUntil && (
+        <div className="bg-amber-50 border-b border-amber-100">
+          <div className="max-w-lg mx-auto px-4 py-2 flex items-center gap-2 text-amber-700">
+            <CloudRain className="w-4 h-4 flex-shrink-0" />
+            <p className="text-xs flex-1">
+              Schedules paused until{' '}
+              {new Date(rainDelayUntil).toLocaleString(undefined, {
+                weekday: 'short', hour: '2-digit', minute: '2-digit',
+              })}
+            </p>
+            <button onClick={handleCancelRain} className="text-xs font-semibold underline">
+              Resume
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab bar — segmented control */}
+      <nav className="max-w-lg mx-auto px-4 pt-4">
+        <div className="bg-white rounded-xl p-1 flex shadow-sm border border-gray-100">
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                tab === id
+                  ? 'bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+        </div>
       </nav>
 
-      <main className="max-w-lg mx-auto px-4 py-6">
+      <main className="max-w-lg mx-auto px-4 py-5 pb-12">
 
-        {/* Zones tab — one ZoneCard per zone */}
+        {/* ZONES TAB */}
         {tab === 'zones' && (
-          <div className="grid gap-4">
-            {/* Show a placeholder while the first fetch is in flight */}
+          <div className="space-y-4">
             {zones.length === 0 && (
-              <p className="text-center text-gray-400 text-sm py-8">Connecting…</p>
+              <p className="text-center text-gray-400 text-sm py-12">Connecting…</p>
             )}
+
             {zones.map(zone => (
               <ZoneCard key={zone.id} zone={zone} onUpdate={updateZone} />
             ))}
+
+            {/* Water all / stop all controls */}
+            {zones.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                {anyOn ? (
+                  <button
+                    onClick={handleStopAll}
+                    className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
+                  >
+                    <Stop className="w-4 h-4" /> Stop everything
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700">Water all zones</p>
+                      <p className="text-xs text-gray-400">Runs each zone in sequence</p>
+                    </div>
+                    <select
+                      value={runAllDuration}
+                      onChange={e => setRunAllDuration(Number(e.target.value))}
+                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    >
+                      {[5, 10, 15, 20, 30].map(d => (
+                        <option key={d} value={d}>{d} min each</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleRunAll}
+                      className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl px-4 py-2 text-xs font-semibold transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Start
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Schedules tab — list of all schedules with edit/delete/toggle actions */}
+        {/* SCHEDULES TAB */}
         {tab === 'schedules' && (
           <div>
-            {/* Primary action button — opens the modal in create mode */}
             <button
               onClick={() => setModal({})}
-              className="w-full mb-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+              className="w-full mb-4 py-2.5 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white rounded-xl text-sm font-semibold transition-all shadow-sm"
             >
               + Add schedule
             </button>
 
             {schedules.length === 0 && (
-              <p className="text-center text-gray-400 text-sm py-8">No schedules yet</p>
+              <div className="text-center py-16 text-gray-300">
+                <Calendar className="w-10 h-10 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">No schedules yet</p>
+              </div>
             )}
 
             <div className="space-y-3">
               {schedules.map(s => {
-                // Look up the zone name for display — zones come from separate API call.
                 const zoneName = zones.find(z => z.id === s.zone_id)?.name ?? `Zone ${s.zone_id}`;
-                // Format the days array for display. Empty array = every day.
-                const daysLabel = s.days.length
-                  ? s.days.map(d => DAY_LABELS[d]).join(', ')
-                  : 'Every day';
-
+                const next = nextRun(s);
                 return (
-                  <div key={s.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div
+                    key={s.id}
+                    className={`bg-white rounded-2xl border shadow-sm p-4 transition-opacity ${
+                      s.enabled ? 'border-gray-100' : 'border-gray-100 opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-start gap-3">
-
-                      {/* Schedule summary — zone, time, duration, days */}
                       <div className="min-w-0">
-                        <p className="font-medium text-gray-800 truncate">{s.name}</p>
-                        <p className="text-sm text-gray-500 mt-0.5">
+                        <p className="font-semibold text-gray-800 truncate">{s.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
                           {zoneName} · {s.start_time} · {s.duration_minutes} min
                         </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{daysLabel}</p>
+                        {/* Next run preview, or paused state */}
+                        <p className={`text-xs mt-1 font-medium ${
+                          s.enabled ? 'text-emerald-600' : 'text-gray-400'
+                        }`}>
+                          {s.enabled && next ? `Next: ${fmtNextRun(next)}` : 'Paused'}
+                        </p>
                       </div>
-
-                      {/*
-                       * Toggle switch — enables or disables the schedule.
-                       * Visually mimics an iOS-style switch using pure CSS:
-                       *   - Outer button is the track (blue = on, grey = off)
-                       *   - Inner span is the white circle that slides left/right
-                       */}
                       <button
                         onClick={() => handleToggle(s.id)}
                         className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
-                          s.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                          s.enabled ? 'bg-emerald-500' : 'bg-gray-200'
                         }`}
                         aria-label={s.enabled ? 'Disable schedule' : 'Enable schedule'}
                       >
@@ -188,18 +337,30 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Inline edit and delete links */}
-                    <div className="flex gap-3 mt-3">
-                      {/* Edit: opens the modal pre-populated with this schedule's data */}
+                    {/* Day-of-week pills */}
+                    <div className="flex gap-1 mt-3">
+                      {DAY_LABELS.map((label, i) => (
+                        <span
+                          key={i}
+                          className={`w-7 h-7 rounded-full text-[10px] font-semibold flex items-center justify-center ${
+                            !s.days.length || s.days.includes(i)
+                              ? 'bg-sky-100 text-sky-600'
+                              : 'bg-gray-50 text-gray-300'
+                          }`}
+                        >
+                          {label[0]}
+                        </span>
+                      ))}
+                      <div className="flex-1" />
                       <button
                         onClick={() => setModal({ schedule: s })}
-                        className="text-xs text-blue-600 hover:underline"
+                        className="text-xs text-sky-600 font-medium hover:underline px-1"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(s.id)}
-                        className="text-xs text-red-500 hover:underline"
+                        className="text-xs text-red-400 font-medium hover:underline px-1"
                       >
                         Delete
                       </button>
@@ -210,13 +371,11 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* HISTORY TAB */}
+        {tab === 'history' && <HistoryList log={log} zones={zones} />}
       </main>
 
-      {/*
-       * Schedule modal — rendered at the App level (outside main) so it overlays
-       * the entire page. Only mounted when modal !== null to keep the DOM clean.
-       * modal.schedule is undefined for create mode, or a schedule object for edit mode.
-       */}
       {modal !== null && (
         <ScheduleModal
           schedule={modal.schedule}

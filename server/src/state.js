@@ -22,7 +22,8 @@ const config = require('./config');
  */
 const zones = {};
 for (const z of config.zones) {
-  zones[z.id] = { id: z.id, name: z.name, pin: z.pin, isOn: false, autoOffAt: null };
+  // startedAt lets the UI draw a progress bar (elapsed vs total run time).
+  zones[z.id] = { id: z.id, name: z.name, pin: z.pin, isOn: false, autoOffAt: null, startedAt: null };
 }
 
 // Stores active setTimeout handles keyed by zone id.

@@ -16,7 +16,7 @@ const router = express.Router();
 const db = require('../db');
 const gpio = require('../gpio');
 const state = require('../state');
-const { runZone } = require('../scheduler');
+const { runZone, runAll, stopAll } = require('../scheduler');
 
 /**
  * GET /api/zones
@@ -31,6 +31,26 @@ const { runZone } = require('../scheduler');
  * ]
  */
 router.get('/', (req, res) => {
+  res.json(state.getAll());
+});
+
+/**
+ * POST /api/zones/run-all
+ * Waters every zone sequentially for the same duration (body: { duration }).
+ * Zone 1 starts now, zone 2 when zone 1 finishes, etc.
+ */
+router.post('/run-all', (req, res) => {
+  const duration = parseInt(req.body.duration) || 10;
+  runAll(duration);
+  res.json(state.getAll());
+});
+
+/**
+ * POST /api/zones/stop-all
+ * Emergency stop — turns off every zone and cancels any queued run-all sequence.
+ */
+router.post('/stop-all', (req, res) => {
+  stopAll();
   res.json(state.getAll());
 });
 
@@ -64,6 +84,7 @@ router.post('/:id/on', (req, res) => {
     state.clearTimer(id);
     zone.isOn = true;
     zone.autoOffAt = null;
+    zone.startedAt = new Date().toISOString();
     gpio.setZone(zone.pin, true);
     db.prepare('INSERT INTO run_log (zone_id, trigger) VALUES (?, ?)').run(id, 'manual');
   }
@@ -88,6 +109,7 @@ router.post('/:id/off', (req, res) => {
   state.clearTimer(id);
   zone.isOn = false;
   zone.autoOffAt = null;
+  zone.startedAt = null;
   gpio.setZone(zone.pin, false);
 
   // Close any open log entries for this zone (there should only be one,

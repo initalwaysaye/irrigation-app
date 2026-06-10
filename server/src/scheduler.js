@@ -23,6 +23,22 @@ const state = require('./state');
 // Used so we can stop old jobs before creating new ones in load().
 const jobs = {};
 
+// Timers queuing up the later zones of a "run all zones" sequence.
+// Tracked separately from per-zone auto-off timers so stopAll() can
+// cancel zones that haven't started yet.
+let chainTimers = [];
+
+/**
+ * Returns true if a rain delay is currently active.
+ * The rain delay timestamp is stored in the settings table so it survives
+ * server restarts. While active, scheduled runs are skipped (manual runs
+ * still work — if you press the button, you mean it).
+ */
+function isRainDelayed() {
+  const until = db.getSetting('rain_delay_until');
+  return Boolean(until && new Date(until) > new Date());
+}
+
 /**
  * Converts a schedule's days-of-week array and time string into a cron expression.
  *
@@ -62,11 +78,18 @@ function runZone(zoneId, durationMinutes, trigger = 'schedule') {
   const zone = state.get(zoneId);
   if (!zone) return;
 
+  // Skip scheduled runs while a rain delay is active. Manual runs go ahead.
+  if (trigger === 'schedule' && isRainDelayed()) {
+    console.log(`[Scheduler] Zone ${zoneId} scheduled run skipped — rain delay active`);
+    return;
+  }
+
   // Cancel any in-progress timed run before starting a new one.
   state.clearTimer(zoneId);
 
   // Update in-memory state so the API immediately reflects the new status.
   zone.isOn = true;
+  zone.startedAt = new Date().toISOString();
   zone.autoOffAt = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
 
   // Open the physical relay/valve.
@@ -86,6 +109,7 @@ function runZone(zoneId, durationMinutes, trigger = 'schedule') {
   const handle = setTimeout(() => {
     zone.isOn = false;
     zone.autoOffAt = null;
+    zone.startedAt = null;
     gpio.setZone(zone.pin, false); // close the valve
     // Stamp the log entry with the actual end time.
     db.prepare("UPDATE run_log SET ended_at = datetime('now') WHERE id = ?").run(lastInsertRowid);
@@ -127,4 +151,51 @@ function load() {
   }
 }
 
-module.exports = { load, runZone };
+/**
+ * Runs all zones one after another, each for the same duration.
+ * Zone 1 starts immediately; zone 2 starts when zone 1's time is up, and so on.
+ * Useful for giving the whole garden a soak without manually babysitting it.
+ *
+ * @param {number} durationMinutes - run time per zone
+ */
+function runAll(durationMinutes) {
+  // Cancel any previous run-all sequence that's still queued.
+  chainTimers.forEach(t => clearTimeout(t));
+  chainTimers = [];
+
+  const zones = state.getAll();
+  zones.forEach((zone, i) => {
+    if (i === 0) {
+      runZone(zone.id, durationMinutes, 'run-all');
+    } else {
+      // Later zones are queued to start when the previous one finishes.
+      chainTimers.push(setTimeout(
+        () => runZone(zone.id, durationMinutes, 'run-all'),
+        i * durationMinutes * 60 * 1000
+      ));
+    }
+  });
+  console.log(`[Scheduler] Run-all started: ${zones.length} zones × ${durationMinutes}m`);
+}
+
+/**
+ * Emergency stop: turns off every zone, cancels all auto-off timers,
+ * and cancels any zones still queued in a run-all sequence.
+ */
+function stopAll() {
+  chainTimers.forEach(t => clearTimeout(t));
+  chainTimers = [];
+
+  for (const zone of state.getAll()) {
+    state.clearTimer(zone.id);
+    zone.isOn = false;
+    zone.autoOffAt = null;
+    zone.startedAt = null;
+    gpio.setZone(zone.pin, false);
+  }
+  // Close out all open log entries in one statement.
+  db.prepare("UPDATE run_log SET ended_at = datetime('now') WHERE ended_at IS NULL").run();
+  console.log('[Scheduler] Stop-all: all zones off');
+}
+
+module.exports = { load, runZone, runAll, stopAll, isRainDelayed };

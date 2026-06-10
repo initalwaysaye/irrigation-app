@@ -1,0 +1,100 @@
+/**
+ * HistoryList.jsx
+ * The History tab — shows the most recent watering events (manual, scheduled,
+ * and run-all), newest first, with relative day grouping.
+ *
+ * Props:
+ *   log   - array of run_log rows from GET /api/zones/log
+ *   zones - zone array, used to map zone_id → display name
+ */
+
+import React from 'react';
+import { Droplet, History } from './Icons';
+
+// Badge colour per trigger type so you can tell at a glance what started a run.
+const TRIGGER_STYLES = {
+  manual:    'bg-sky-50 text-sky-600',
+  schedule:  'bg-emerald-50 text-emerald-600',
+  'run-all': 'bg-violet-50 text-violet-600',
+};
+
+/**
+ * SQLite's datetime('now') stores UTC as "YYYY-MM-DD HH:MM:SS" with no
+ * timezone marker, so we append 'Z' to parse it as UTC; the Date then
+ * renders in the browser's local timezone.
+ */
+function parseUtc(s) {
+  return new Date(s.replace(' ', 'T') + 'Z');
+}
+
+/** Formats a date as "Today", "Yesterday", or "Mon 8 Jun". */
+function dayLabel(date) {
+  const today = new Date();
+  const d = new Date(date);
+  const startOfDay = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(today) - startOfDay(d)) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+export default function HistoryList({ log, zones }) {
+  if (!log.length) {
+    return (
+      <div className="text-center py-16 text-gray-300">
+        <History className="w-10 h-10 mx-auto mb-3" />
+        <p className="text-sm text-gray-400">No watering history yet</p>
+      </div>
+    );
+  }
+
+  // Group entries by day for section headers.
+  const groups = [];
+  for (const entry of log) {
+    const started = parseUtc(entry.started_at);
+    const label = dayLabel(started);
+    let group = groups[groups.length - 1];
+    if (!group || group.label !== label) {
+      group = { label, entries: [] };
+      groups.push(group);
+    }
+    group.entries.push({ ...entry, started });
+  }
+
+  return (
+    <div className="space-y-6">
+      {groups.map(group => (
+        <div key={group.label}>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+            {group.label}
+          </h3>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+            {group.entries.map(e => {
+              const zoneName = zones.find(z => z.id === e.zone_id)?.name ?? `Zone ${e.zone_id}`;
+              const time = e.started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={e.id} className="flex items-center gap-3 p-3.5">
+                  <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-400 flex items-center justify-center flex-shrink-0">
+                    <Droplet className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{zoneName}</p>
+                    <p className="text-xs text-gray-400">
+                      {time}{e.duration_minutes ? ` · ${e.duration_minutes} min` : ''}
+                      {!e.ended_at && ' · running'}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+                    TRIGGER_STYLES[e.trigger] ?? 'bg-gray-50 text-gray-500'
+                  }`}>
+                    {e.trigger}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

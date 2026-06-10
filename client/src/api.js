@@ -81,3 +81,26 @@ export const toggleSchedule = (id) =>
 /** Permanently deletes a schedule. Returns null (204 No Content). */
 export const deleteSchedule = (id) =>
   req(`/schedules/${id}`, { method: 'DELETE' });
+
+// --- Run-all / stop-all ---
+
+/** Waters every zone sequentially, each for `duration` minutes. */
+export const runAllZones = (duration) =>
+  req('/zones/run-all', { method: 'POST', body: { duration } });
+
+/** Emergency stop — turns off all zones and cancels queued run-all zones. */
+export const stopAllZones = () =>
+  req('/zones/stop-all', { method: 'POST' });
+
+// --- System / rain delay ---
+
+/** Fetches system status: { rainDelayUntil: ISO string | null }. */
+export const fetchStatus = () => req('/system/status');
+
+/** Pauses all scheduled watering for the given number of hours. */
+export const setRainDelay = (hours) =>
+  req('/system/rain-delay', { method: 'POST', body: { hours } });
+
+/** Cancels the rain delay so schedules resume immediately. */
+export const cancelRainDelay = () =>
+  req('/system/rain-delay', { method: 'DELETE' });

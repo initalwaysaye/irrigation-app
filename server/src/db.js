@@ -42,9 +42,26 @@ db.exec(`
     started_at       TEXT    NOT NULL DEFAULT (datetime('now')),
     ended_at         TEXT,                     -- NULL while the zone is still running
     duration_minutes INTEGER,                  -- NULL for indefinite manual runs
-    trigger          TEXT    NOT NULL DEFAULT 'manual'  -- 'manual' or 'schedule'
+    trigger          TEXT    NOT NULL DEFAULT 'manual'  -- 'manual', 'schedule', or 'run-all'
+  );
+
+  -- Simple key/value store for app-wide settings (e.g. rain delay).
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT
   );
 `);
+
+// Convenience helpers for the settings key/value table, attached to the db
+// instance so callers don't need a separate import.
+db.getSetting = (key) => {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  return row ? row.value : null;
+};
+db.setSetting = (key, value) =>
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(key, value);
+db.deleteSetting = (key) => db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 
 // If the server was killed mid-run (crash, power loss, etc.) there may be
 // run_log rows with no ended_at. Close them out now so the log stays clean.

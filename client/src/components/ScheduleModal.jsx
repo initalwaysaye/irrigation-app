@@ -61,7 +61,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6"
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-xl font-semibold mb-5 text-gray-900">
@@ -76,7 +76,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
             <select
               value={form.zone_id}
               onChange={e => set('zone_id', Number(e.target.value))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
             >
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
@@ -91,7 +91,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
               onChange={e => set('name', e.target.value)}
               required
               placeholder="e.g. Morning front lawn"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                   onClick={() => toggleDay(i)}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     form.days.includes(i)
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-sky-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -134,7 +134,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                 value={form.start_time}
                 onChange={e => set('start_time', e.target.value)}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
               />
             </div>
             <div className="flex-1">
@@ -146,7 +146,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                 value={form.duration_minutes}
                 onChange={e => set('duration_minutes', Number(e.target.value))}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
               />
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
             </button>
             <button
               type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
+              className="flex-1 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               {schedule ? 'Save changes' : 'Add schedule'}
             </button>

@@ -39,6 +39,7 @@ app.use(express.json());
 // Mount the API route handlers. All irrigation control logic lives here.
 app.use('/api/zones', require('./routes/zones'));
 app.use('/api/schedules', require('./routes/schedules'));
+app.use('/api/system', require('./routes/system'));
 
 // Serve the compiled React app for any non-API request.
 // express.static serves files from client/dist/ (index.html, JS bundles, CSS).
