@@ -1,20 +1,13 @@
 /**
  * gpio.js
- * Abstracts all physical GPIO hardware access behind a simple on/off interface.
- *
- * Because this app needs to be developed and tested on a regular laptop (no GPIO),
- * this module automatically falls back to "mock mode" when it detects it isn't
- * running on a Raspberry Pi — or when MOCK_GPIO=true is set in the environment.
- * In mock mode all GPIO calls are replaced with console.log statements so you can
- * see exactly what would happen on real hardware.
+ * GPIO control using the rpio package, which memory-maps /dev/gpiomem directly.
+ * Works on Pi 1/2/3/4/5 without needing a daemon or the sysfs interface.
+ * Requires the user to be in the 'gpio' group (standard on Raspberry Pi OS).
  */
 
 const fs = require('fs');
 const config = require('./config');
 
-// Decide at module load time whether to use real GPIO or the mock.
-// This avoids sprinkling if/else checks throughout every function.
-// Note: MOCK may be upgraded to true inside init() if the hardware init fails.
 let MOCK = process.env.MOCK_GPIO === 'true' || !isRaspberryPi();
 
 /**
@@ -31,18 +24,10 @@ function isRaspberryPi() {
   }
 }
 
-// Stores the onoff Gpio objects keyed by pin number.
-// These are only populated when running on real hardware.
-const gpioObjects = {};
-
 /**
  * Initialises all GPIO pins as outputs and drives them to the "off" state.
- * Must be called once at server startup before any setZone() calls.
- *
- * On real hardware: requires the 'onoff' package and the user being in the
- * 'gpio' group (or running as root). Uses require() inside the function so
- * that in mock mode the onoff package is never even loaded (avoids errors on
- * machines where it isn't installed or can't access hardware).
+ * Uses rpio which memory-maps /dev/gpiomem directly — no sysfs, no daemon needed.
+ * Falls back to mock mode if initialisation fails (e.g. wrong group membership).
  */
 function init() {
   if (MOCK) {
@@ -50,20 +35,21 @@ function init() {
     return;
   }
   try {
-    const { Gpio } = require('onoff');
-    const offValue = config.activeHigh ? 0 : 1;
+    const rpio = require('rpio');
+    // Use BCM (GPIO) pin numbering rather than physical header numbering.
+    // gpiomem: true uses /dev/gpiomem which is accessible to the gpio group without sudo.
+    rpio.init({ mapping: 'gpio', gpiomem: true });
+    const offValue = config.activeHigh ? rpio.HIGH : rpio.LOW;
     for (const zone of config.zones) {
-      gpioObjects[zone.pin] = new Gpio(zone.pin, 'out');
-      gpioObjects[zone.pin].writeSync(offValue);
+      rpio.open(zone.pin, rpio.OUTPUT, offValue);
     }
-    console.log('[GPIO] Initialized, all zones off');
+    console.log('[GPIO] Initialized via rpio, all zones off');
   } catch (err) {
-    // GPIO access failed — most likely the user isn't in the 'gpio' group yet.
-    // Fall back to mock mode so the server still starts and the UI works.
-    // Fix: run  sudo usermod -aG gpio $USER  then reboot, then restart the server.
+    // Fall back to mock so the server still starts even if GPIO is unavailable.
+    // Fix: sudo usermod -aG gpio $USER then reboot.
     MOCK = true;
     console.warn('[GPIO] Hardware init failed, falling back to mock mode.');
-    console.warn('[GPIO] To enable real GPIO: sudo usermod -aG gpio $USER  then reboot.');
+    console.warn('[GPIO] Make sure the user is in the gpio group: sudo usermod -aG gpio $USER');
     console.warn('[GPIO] Error was:', err.message);
   }
 }
@@ -74,32 +60,31 @@ function init() {
  * @param {number} pin - BCM GPIO pin number (from config)
  * @param {boolean} on  - true to open the valve, false to close it
  *
- * The actual electrical signal written to the pin is inverted when using
- * an active-LOW relay board (the common case), because on those boards:
+ * For active-LOW relay boards (the common case):
  *   LOW signal (0) = relay coil energised = valve OPEN
  *   HIGH signal (1) = relay coil de-energised = valve CLOSED
  */
 function setZone(pin, on) {
-  // Translate the logical on/off to the correct electrical signal level.
-  const value = config.activeHigh ? (on ? 1 : 0) : (on ? 0 : 1);
   if (MOCK) {
-    console.log(`[GPIO] Mock: pin ${pin} → ${on ? 'ON' : 'OFF'} (write ${value})`);
+    console.log(`[GPIO] Mock: pin ${pin} → ${on ? 'ON' : 'OFF'}`);
     return;
   }
-  gpioObjects[pin].writeSync(value);
+  const rpio = require('rpio');
+  const value = config.activeHigh ? (on ? rpio.HIGH : rpio.LOW) : (on ? rpio.LOW : rpio.HIGH);
+  rpio.write(pin, value);
 }
 
 /**
- * Drives all pins back to "off" and releases the GPIO resources.
- * Called when the server is shutting down (SIGTERM/SIGINT) to ensure
- * valves don't stay open if the process exits unexpectedly.
+ * Drives all pins back to "off" and releases GPIO resources.
+ * Called on server shutdown to ensure valves don't stay open.
  */
 function cleanup() {
   if (MOCK) return;
-  const offValue = config.activeHigh ? 0 : 1;
-  for (const gpio of Object.values(gpioObjects)) {
-    gpio.writeSync(offValue); // close the valve
-    gpio.unexport();          // release the pin back to the OS
+  const rpio = require('rpio');
+  const offValue = config.activeHigh ? rpio.HIGH : rpio.LOW;
+  for (const zone of config.zones) {
+    rpio.write(zone.pin, offValue);
+    rpio.close(zone.pin);
   }
 }
 
