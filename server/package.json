@@ -1,5 +1,5 @@
 {
-  "name": "irrigation-server",
+  "name": "home-automation-server",
   "version": "1.0.0",
   "scripts": {
     "start": "node src/index.js",

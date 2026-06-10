@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { turnOn, turnOff } from '../api';
 import { Droplet, Play, Stop } from './Icons';
+import { fmtTime } from '../utils';
 
 // Duration quick-pick options (minutes).
 const DURATIONS = [5, 10, 15, 30, 60];
@@ -46,13 +47,6 @@ function useRunProgress(autoOffAt, startedAt) {
   return { secondsLeft, progress };
 }
 
-/** Formats seconds as "m:ss" (e.g. 754 → "12:34"). */
-function fmtTime(secs) {
-  const m = Math.floor(secs / 60);
-  const s = String(secs % 60).padStart(2, '0');
-  return `${m}:${s}`;
-}
-
 export default function ZoneCard({ zone, onUpdate }) {
   const [duration, setDuration] = useState(10);
   const [busy, setBusy] = useState(false);
@@ -71,22 +65,22 @@ export default function ZoneCard({ zone, onUpdate }) {
   return (
     <div className={`rounded-2xl p-5 transition-all duration-300 ${
       zone.isOn
-        ? 'bg-gradient-to-br from-sky-500 to-cyan-600 text-white shadow-lg shadow-sky-200'
-        : 'bg-white border border-gray-100 shadow-sm'
+        ? 'bg-gradient-to-br from-cyan-600 to-sky-700 text-white shadow-lg shadow-cyan-900/40 glow-active'
+        : 'bg-slate-800/70 border border-slate-700/60'
     }`}>
 
       {/* Header row: droplet icon, name, status */}
       <div className="flex items-center gap-3 mb-4">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-          zone.isOn ? 'bg-white/20' : 'bg-sky-50 text-sky-500'
+          zone.isOn ? 'bg-white/20' : 'bg-cyan-500/10 text-cyan-400'
         }`}>
           <Droplet className={`w-5 h-5 ${zone.isOn ? 'animate-pulse' : ''}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className={`font-semibold truncate ${zone.isOn ? 'text-white' : 'text-gray-800'}`}>
+          <h2 className={`font-semibold truncate ${zone.isOn ? 'text-white' : 'text-gray-100'}`}>
             {zone.name}
           </h2>
-          <p className={`text-xs ${zone.isOn ? 'text-sky-100' : 'text-gray-400'}`}>
+          <p className={`text-xs ${zone.isOn ? 'text-cyan-100' : 'text-slate-500'}`}>
             {zone.isOn
               ? (secondsLeft != null ? `Watering — ${fmtTime(secondsLeft)} remaining` : 'Watering — manual stop')
               : 'Idle'}
@@ -94,7 +88,7 @@ export default function ZoneCard({ zone, onUpdate }) {
         </div>
         {/* Status dot */}
         <span className={`w-2.5 h-2.5 rounded-full ${
-          zone.isOn ? 'bg-white animate-pulse' : 'bg-gray-200'
+          zone.isOn ? 'bg-white animate-pulse' : 'bg-slate-600'
         }`} />
       </div>
 
@@ -117,8 +111,8 @@ export default function ZoneCard({ zone, onUpdate }) {
               onClick={() => setDuration(d)}
               className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 duration === d
-                  ? 'bg-sky-500 text-white'
-                  : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  ? 'bg-cyan-500 text-white'
+                  : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
               }`}
             >
               {d}m
@@ -140,7 +134,7 @@ export default function ZoneCard({ zone, onUpdate }) {
         <button
           onClick={() => call(() => turnOn(zone.id, duration))}
           disabled={busy}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-all shadow-sm"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-all"
         >
           <Play className="w-4 h-4" /> Water for {duration} min
         </button>

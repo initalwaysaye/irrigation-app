@@ -13,9 +13,9 @@ import { Droplet, History } from './Icons';
 
 // Badge colour per trigger type so you can tell at a glance what started a run.
 const TRIGGER_STYLES = {
-  manual:    'bg-sky-50 text-sky-600',
-  schedule:  'bg-emerald-50 text-emerald-600',
-  'run-all': 'bg-violet-50 text-violet-600',
+  manual:    'bg-cyan-500/10 text-cyan-400',
+  schedule:  'bg-emerald-500/10 text-emerald-400',
+  'run-all': 'bg-violet-500/10 text-violet-400',
 };
 
 /**
@@ -41,9 +41,9 @@ function dayLabel(date) {
 export default function HistoryList({ log, zones }) {
   if (!log.length) {
     return (
-      <div className="text-center py-16 text-gray-300">
+      <div className="text-center py-16 text-slate-700">
         <History className="w-10 h-10 mx-auto mb-3" />
-        <p className="text-sm text-gray-400">No watering history yet</p>
+        <p className="text-sm text-slate-500">No watering history yet</p>
       </div>
     );
   }
@@ -65,27 +65,27 @@ export default function HistoryList({ log, zones }) {
     <div className="space-y-6">
       {groups.map(group => (
         <div key={group.label}>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 px-1">
             {group.label}
           </h3>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+          <div className="bg-slate-800/70 rounded-2xl border border-slate-700/60 divide-y divide-slate-700/40">
             {group.entries.map(e => {
               const zoneName = zones.find(z => z.id === e.zone_id)?.name ?? `Zone ${e.zone_id}`;
               const time = e.started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
               return (
                 <div key={e.id} className="flex items-center gap-3 p-3.5">
-                  <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-400 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0">
                     <Droplet className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">{zoneName}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-sm font-medium text-gray-200 truncate">{zoneName}</p>
+                    <p className="text-xs text-slate-500">
                       {time}{e.duration_minutes ? ` · ${e.duration_minutes} min` : ''}
                       {!e.ended_at && ' · running'}
                     </p>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
-                    TRIGGER_STYLES[e.trigger] ?? 'bg-gray-50 text-gray-500'
+                    TRIGGER_STYLES[e.trigger] ?? 'bg-slate-700/50 text-slate-400'
                   }`}>
                     {e.trigger}
                   </span>

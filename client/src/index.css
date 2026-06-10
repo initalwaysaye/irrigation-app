@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark app background — slightly warmer than pure black. */
+body {
+  background-color: #0a0f1a;
+}
+
+/* Screen transition: each view fades in and slides up slightly when it mounts.
+   Applied via key={view} so React remounts the wrapper on navigation. */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-enter {
+  animation: screen-enter 0.25s ease-out;
+}
+
+/* Soft breathing glow for active tiles. */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 24px 0 rgba(34, 211, 238, 0.18); }
+  50%      { box-shadow: 0 0 36px 4px rgba(34, 211, 238, 0.32); }
+}
+
+.glow-active {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}

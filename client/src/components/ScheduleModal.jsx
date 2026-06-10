@@ -57,14 +57,14 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
      * so clicking inside the modal doesn't close it.
      */
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6"
+        className="bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-md p-6"
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-xl font-semibold mb-5 text-gray-900">
+        <h2 className="text-xl font-semibold mb-5 text-gray-100">
           {schedule ? 'Edit Schedule' : 'New Schedule'}
         </h2>
 
@@ -72,11 +72,11 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
 
           {/* Zone selector — which relay/valve this schedule controls */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Zone</label>
             <select
               value={form.zone_id}
               onChange={e => set('zone_id', Number(e.target.value))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+              className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             >
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
@@ -84,14 +84,14 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
 
           {/* Human-readable name for identifying this schedule in the list */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
             <input
               type="text"
               value={form.name}
               onChange={e => set('name', e.target.value)}
               required
               placeholder="e.g. Morning front lawn"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+              className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
           </div>
 
@@ -102,9 +102,9 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
            * (the server converts an empty array to '*' in the cron expression).
            */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Days{' '}
-              <span className="font-normal text-gray-400">(leave empty for every day)</span>
+              <span className="font-normal text-slate-500">(leave empty for every day)</span>
             </label>
             <div className="flex gap-1 flex-wrap">
               {DAY_LABELS.map((label, i) => (
@@ -114,8 +114,8 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                   onClick={() => toggleDay(i)}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     form.days.includes(i)
-                      ? 'bg-sky-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
                   {label}
@@ -127,18 +127,18 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
           {/* Start time and duration — side by side to save vertical space */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start time</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Start time</label>
               {/* type="time" gives a native time picker on mobile */}
               <input
                 type="time"
                 value={form.start_time}
                 onChange={e => set('start_time', e.target.value)}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Duration (min)</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Duration (min)</label>
               <input
                 type="number"
                 min="1"
@@ -146,7 +146,7 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                 value={form.duration_minutes}
                 onChange={e => set('duration_minutes', Number(e.target.value))}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
             </div>
           </div>
@@ -156,13 +156,13 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex-1 border border-slate-600 rounded-lg py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700/50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
+              className="flex-1 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               {schedule ? 'Save changes' : 'Add schedule'}
             </button>

@@ -63,3 +63,34 @@ export const History = ({ className = 'w-5 h-5' }) => (
     <polyline points="12 7 12 12 15 15" />
   </svg>
 );
+
+/** Snowflake — air conditioning module. */
+export const Snowflake = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <line x1="3.34" y1="7" x2="20.66" y2="17" />
+    <line x1="3.34" y1="17" x2="20.66" y2="7" />
+    <path d="M12 2l2 3-2 1-2-1 2-3" fill="none" />
+  </svg>
+);
+
+/** Flame — underfloor heating module. */
+export const Flame = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 23c-4.97 0-8-3.58-8-8 0-3.07 1.64-5.64 3.2-7.4.83-.93 2.3-.3 2.3.95V10a1.5 1.5 0 0 0 2.9.54c.83-2.14 1.6-4.93 1.6-7.04 0-.96 1.06-1.57 1.83-1 2.66 1.97 6.17 5.94 6.17 12.5 0 4.42-3.03 8-8 8h-2z" transform="scale(0.9) translate(1.2 0.5)" />
+  </svg>
+);
+
+/** Chevron left — back navigation. */
+export const ChevronLeft = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+/** Chevron right — tile affordance. */
+export const ChevronRight = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
