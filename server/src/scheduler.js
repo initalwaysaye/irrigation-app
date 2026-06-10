@@ -18,6 +18,7 @@ const cron = require('node-cron');
 const db = require('./db');
 const gpio = require('./gpio');
 const state = require('./state');
+const { getCurrentTemp } = require('./weather');
 
 // Stores active cron job handles keyed by schedule id.
 // Used so we can stop old jobs before creating new ones in load().
@@ -141,8 +142,28 @@ function load() {
     try {
       // cron.schedule() returns a task object. The callback fires whenever
       // the cron expression matches the current time.
-      jobs[s.id] = cron.schedule(expr, () => runZone(s.zone_id, s.duration_minutes, 'schedule'));
-      console.log(`[Scheduler] Loaded schedule ${s.id}: "${s.name}" (${expr})`);
+      //
+      // Temperature-conditional schedules (temp_threshold set) check the
+      // current outdoor temperature first and only run when it's at or above
+      // the threshold. If the temperature can't be determined (no location
+      // configured, API down) the run is skipped — failing safe rather than
+      // watering when the condition can't be verified.
+      jobs[s.id] = cron.schedule(expr, async () => {
+        if (s.temp_threshold != null) {
+          const temp = await getCurrentTemp();
+          if (temp == null) {
+            console.log(`[Scheduler] Schedule ${s.id} "${s.name}" skipped — temperature unavailable`);
+            return;
+          }
+          if (temp < s.temp_threshold) {
+            console.log(`[Scheduler] Schedule ${s.id} "${s.name}" skipped — ${temp}°C < ${s.temp_threshold}°C threshold`);
+            return;
+          }
+          console.log(`[Scheduler] Schedule ${s.id} "${s.name}" condition met — ${temp}°C ≥ ${s.temp_threshold}°C`);
+        }
+        runZone(s.zone_id, s.duration_minutes, 'schedule');
+      });
+      console.log(`[Scheduler] Loaded schedule ${s.id}: "${s.name}" (${expr}${s.temp_threshold != null ? `, ≥${s.temp_threshold}°C` : ''})`);
     } catch (err) {
       // Log bad cron expressions rather than crashing — a corrupt schedule
       // row shouldn't take down the whole server.

@@ -19,13 +19,14 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DEFAULTS = {
   zone_id: 1,
   name: '',
-  days: [],           // empty array = runs every day
+  days: [],             // empty array = runs every day
   start_time: '06:00',
   duration_minutes: 10,
   enabled: true,
+  temp_threshold: null, // null = no temperature condition
 };
 
-export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
+export default function ScheduleModal({ schedule, zones, hasLocation, onSave, onClose }) {
   // Initialise form state from the existing schedule (edit mode) or defaults (create mode).
   // Spread into a new object so edits don't mutate the prop directly.
   const [form, setForm] = useState(schedule ? { ...schedule } : { ...DEFAULTS });
@@ -124,9 +125,11 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Start time and duration — side by side to save vertical space */}
+          {/* Start time and duration — side by side to save vertical space.
+              min-w-0 lets each column shrink below the native input's intrinsic
+              width; h-10 keeps the two different input types the same height. */}
           <div className="flex gap-3">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-slate-300 mb-1">Start time</label>
               {/* type="time" gives a native time picker on mobile */}
               <input
@@ -134,10 +137,10 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                 value={form.start_time}
                 onChange={e => set('start_time', e.target.value)}
                 required
-                className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                className="w-full h-10 bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-slate-300 mb-1">Duration (min)</label>
               <input
                 type="number"
@@ -146,9 +149,58 @@ export default function ScheduleModal({ schedule, zones, onSave, onClose }) {
                 value={form.duration_minutes}
                 onChange={e => set('duration_minutes', Number(e.target.value))}
                 required
-                className="w-full bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                className="w-full h-10 bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
             </div>
+          </div>
+
+          {/*
+           * Hot-day condition: when enabled, the schedule only runs if the
+           * current outdoor temperature (from the weather API) is at or above
+           * the threshold. temp_threshold is null when the condition is off.
+           */}
+          <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-300">Hot-day condition</p>
+                <p className="text-xs text-slate-500 mt-0.5">Only run when it's hot outside</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => set('temp_threshold', form.temp_threshold == null ? 25 : null)}
+                className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
+                  form.temp_threshold != null ? 'bg-amber-500' : 'bg-slate-600'
+                }`}
+                aria-label="Toggle temperature condition"
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${
+                  form.temp_threshold != null ? 'left-6' : 'left-1'
+                }`} />
+              </button>
+            </div>
+            {form.temp_threshold != null && (
+              <>
+                <div className="flex items-center gap-2 mt-3">
+                  <span className="text-xs text-slate-400">Only run if at least</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="45"
+                    value={form.temp_threshold}
+                    onChange={e => set('temp_threshold', Number(e.target.value))}
+                    className="w-16 h-9 bg-slate-900 border border-slate-600 text-gray-100 rounded-lg px-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                  <span className="text-xs text-slate-400">°C</span>
+                </div>
+                {/* The weather check needs a home location — point at where to set it. */}
+                {!hasLocation && (
+                  <p className="text-xs text-amber-400/80 mt-2">
+                    Set your home location in Usage → Home location first, or this
+                    schedule will be skipped.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Form actions */}

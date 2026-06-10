@@ -94,3 +94,27 @@ export const ChevronRight = ({ className = 'w-5 h-5' }) => (
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
+
+/** Gauge / meter — usage & cost tab. */
+export const Gauge = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 15l3.5-5.5" />
+    <path d="M20.2 17.2a9 9 0 1 0 -16.4 0" />
+    <circle cx="12" cy="15" r="1.5" fill="currentColor" />
+  </svg>
+);
+
+/** Thermometer — temperature-conditional schedules. */
+export const Thermometer = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+  </svg>
+);
+
+/** Map pin — home location setting. */
+export const MapPin = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);

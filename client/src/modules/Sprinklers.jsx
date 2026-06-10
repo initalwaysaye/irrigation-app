@@ -13,13 +13,16 @@ import React, { useState, useEffect } from 'react';
 import ZoneCard from '../components/ZoneCard';
 import ScheduleModal from '../components/ScheduleModal';
 import HistoryList from '../components/HistoryList';
-import { Droplet, CloudRain, Calendar, History, Play, Stop, ChevronLeft } from '../components/Icons';
+import UsageTab from '../components/UsageTab';
+import { Droplet, CloudRain, Calendar, History, Play, Stop, ChevronLeft, Gauge, Thermometer } from '../components/Icons';
 import { DAY_LABELS, nextRun, fmtNextRun } from '../utils';
+import { fetchSettings, saveSettings, fetchUsage } from '../api';
 
 const TABS = [
   { id: 'zones',     label: 'Zones',     Icon: Droplet },
   { id: 'schedules', label: 'Schedules', Icon: Calendar },
   { id: 'history',   label: 'History',   Icon: History },
+  { id: 'usage',     label: 'Usage',     Icon: Gauge },
 ];
 
 export default function Sprinklers({
@@ -33,14 +36,31 @@ export default function Sprinklers({
   const [rainPanel, setRainPanel] = useState(false);
   const [runAllDuration, setRunAllDuration] = useState(10);
 
-  // Refresh the history list whenever the user switches to that tab.
-  useEffect(() => { if (tab === 'history') onRefreshLog(); }, [tab]);
+  // Settings (flow rates, tariff, location) and usage stats are module-local —
+  // nothing outside the sprinklers module needs them.
+  const [settings, setSettings] = useState(null);
+  const [usage, setUsage] = useState(null);
+
+  useEffect(() => { fetchSettings().then(setSettings); }, []);
+
+  // Refresh tab-specific data when the user switches tabs.
+  useEffect(() => {
+    if (tab === 'history') onRefreshLog();
+    if (tab === 'usage') fetchUsage().then(setUsage);
+  }, [tab]);
 
   const anyOn = zones.some(z => z.isOn);
 
   async function handleSave(form) {
     await onSaveSchedule(form);
     setModal(null);
+  }
+
+  /** Saves settings then refreshes the usage stats so new rates apply immediately. */
+  async function handleSaveSettings(patch) {
+    const merged = await saveSettings(patch);
+    setSettings(merged);
+    setUsage(await fetchUsage());
   }
 
   return (
@@ -214,7 +234,15 @@ export default function Sprinklers({
                 >
                   <div className="flex justify-between items-start gap-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-100 truncate">{s.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="font-semibold text-gray-100 truncate">{s.name}</p>
+                        {/* Hot-day condition pill */}
+                        {s.temp_threshold != null && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-semibold flex-shrink-0">
+                            <Thermometer className="w-2.5 h-2.5" /> ≥{s.temp_threshold}°C
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {zoneName} · {s.start_time} · {s.duration_minutes} min
                       </p>
@@ -272,13 +300,26 @@ export default function Sprinklers({
         </div>
       )}
 
-      {/* HISTORY TAB */}
-      {tab === 'history' && <HistoryList log={log} zones={zones} />}
+      {/* HISTORY TAB — settings enable per-entry cost estimates */}
+      {tab === 'history' && <HistoryList log={log} zones={zones} settings={settings} />}
+
+      {/* USAGE TAB — cost dashboard + settings. Keyed on settings so the form
+          re-initialises once the settings fetch lands. */}
+      {tab === 'usage' && settings !== null && (
+        <UsageTab
+          key={JSON.stringify(settings)}
+          zones={zones}
+          usage={usage}
+          settings={settings}
+          onSave={handleSaveSettings}
+        />
+      )}
 
       {modal !== null && (
         <ScheduleModal
           schedule={modal.schedule}
           zones={zones}
+          hasLocation={Boolean(settings?.location)}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />

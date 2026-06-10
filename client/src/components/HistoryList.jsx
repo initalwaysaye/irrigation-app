@@ -38,7 +38,22 @@ function dayLabel(date) {
   return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-export default function HistoryList({ log, zones }) {
+/**
+ * Estimates litres and cost for a completed run from its actual start/end
+ * timestamps and the zone's flow rate. Returns null when the entry is still
+ * running or the settings needed for the calculation aren't configured.
+ */
+function entryCost(e, settings) {
+  const rate = Number(settings?.flowRates?.[e.zone_id]);
+  if (!rate || !e.ended_at) return null;
+  const minutes = Math.max(0, (parseUtc(e.ended_at) - parseUtc(e.started_at)) / 60000);
+  const litres = Math.round(minutes * rate);
+  const tariff = Number(settings?.tariffPerM3);
+  const cost = tariff ? (litres * tariff / 1000) : null;
+  return { litres, cost };
+}
+
+export default function HistoryList({ log, zones, settings }) {
   if (!log.length) {
     return (
       <div className="text-center py-16 text-slate-700">
@@ -72,6 +87,7 @@ export default function HistoryList({ log, zones }) {
             {group.entries.map(e => {
               const zoneName = zones.find(z => z.id === e.zone_id)?.name ?? `Zone ${e.zone_id}`;
               const time = e.started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+              const usage = entryCost(e, settings);
               return (
                 <div key={e.id} className="flex items-center gap-3 p-3.5">
                   <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0">
@@ -82,6 +98,7 @@ export default function HistoryList({ log, zones }) {
                     <p className="text-xs text-slate-500">
                       {time}{e.duration_minutes ? ` · ${e.duration_minutes} min` : ''}
                       {!e.ended_at && ' · running'}
+                      {usage && ` · ${usage.litres} L${usage.cost != null ? ` · £${usage.cost.toFixed(2)}` : ''}`}
                     </p>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${

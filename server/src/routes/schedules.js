@@ -45,7 +45,7 @@ router.get('/', (req, res) => {
  * Returns the created schedule as JSON with HTTP 201.
  */
 router.post('/', (req, res) => {
-  const { zone_id, name, days = [], start_time, duration_minutes, enabled = true } = req.body;
+  const { zone_id, name, days = [], start_time, duration_minutes, enabled = true, temp_threshold = null } = req.body;
 
   // Validate that all required fields are present before touching the DB.
   if (!zone_id || !name || !start_time || !duration_minutes) {
@@ -53,10 +53,11 @@ router.post('/', (req, res) => {
   }
 
   const { lastInsertRowid } = db
-    .prepare('INSERT INTO schedules (zone_id, name, days, start_time, duration_minutes, enabled) VALUES (?, ?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO schedules (zone_id, name, days, start_time, duration_minutes, enabled, temp_threshold) VALUES (?, ?, ?, ?, ?, ?, ?)')
     // Serialise days array to JSON string for storage.
     // Convert boolean enabled to integer (1/0) for SQLite.
-    .run(zone_id, name, JSON.stringify(days), start_time, duration_minutes, enabled ? 1 : 0);
+    // temp_threshold: null = unconditional, number = only run at/above that °C.
+    .run(zone_id, name, JSON.stringify(days), start_time, duration_minutes, enabled ? 1 : 0, temp_threshold);
 
   // Rebuild cron jobs to include the new schedule.
   scheduler.load();
@@ -75,12 +76,12 @@ router.post('/', (req, res) => {
  */
 router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
-  const { zone_id, name, days = [], start_time, duration_minutes, enabled } = req.body;
+  const { zone_id, name, days = [], start_time, duration_minutes, enabled, temp_threshold = null } = req.body;
 
   // .changes is the number of rows affected — 0 means the id wasn't found.
   const { changes } = db
-    .prepare('UPDATE schedules SET zone_id=?, name=?, days=?, start_time=?, duration_minutes=?, enabled=? WHERE id=?')
-    .run(zone_id, name, JSON.stringify(days), start_time, duration_minutes, enabled ? 1 : 0, id);
+    .prepare('UPDATE schedules SET zone_id=?, name=?, days=?, start_time=?, duration_minutes=?, enabled=?, temp_threshold=? WHERE id=?')
+    .run(zone_id, name, JSON.stringify(days), start_time, duration_minutes, enabled ? 1 : 0, temp_threshold, id);
 
   if (!changes) return res.status(404).json({ error: 'Schedule not found' });
 

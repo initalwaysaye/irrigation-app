@@ -104,3 +104,15 @@ export const setRainDelay = (hours) =>
 /** Cancels the rain delay so schedules resume immediately. */
 export const cancelRainDelay = () =>
   req('/system/rain-delay', { method: 'DELETE' });
+
+// --- Settings & usage (cost tracking, weather location) ---
+
+/** Fetches app settings: { flowRates, tariffPerM3, location }. */
+export const fetchSettings = () => req('/system/settings');
+
+/** Saves app settings — shallow-merged server-side with what's stored. */
+export const saveSettings = (data) =>
+  req('/system/settings', { method: 'PUT', body: data });
+
+/** Fetches aggregated water usage and cost: { configured, periods }. */
+export const fetchUsage = () => req('/system/usage');

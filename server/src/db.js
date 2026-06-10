@@ -63,6 +63,16 @@ db.setSetting = (key, value) =>
     .run(key, value);
 db.deleteSetting = (key) => db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 
+// Migration: add temp_threshold to schedules if it doesn't exist yet.
+// NULL = unconditional schedule; a number = only run when the current outdoor
+// temperature (from the weather API) is at or above that many °C.
+// SQLite has no "ADD COLUMN IF NOT EXISTS", so check the table info first.
+const scheduleCols = db.prepare('PRAGMA table_info(schedules)').all().map(c => c.name);
+if (!scheduleCols.includes('temp_threshold')) {
+  db.exec('ALTER TABLE schedules ADD COLUMN temp_threshold REAL');
+  console.log('[DB] Migrated: added schedules.temp_threshold');
+}
+
 // If the server was killed mid-run (crash, power loss, etc.) there may be
 // run_log rows with no ended_at. Close them out now so the log stays clean.
 // The zones themselves are reset to off by state.js on startup.

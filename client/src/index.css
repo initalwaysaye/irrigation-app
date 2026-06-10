@@ -2,9 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark app background — slightly warmer than pure black. */
+/* Dark app background — slightly warmer than pure black.
+   color-scheme: dark makes native form controls (time pickers, number
+   spinners, dropdowns) render in their dark variants so they match the UI. */
 body {
   background-color: #0a0f1a;
+  color-scheme: dark;
 }
 
 /* Screen transition: each view fades in and slides up slightly when it mounts.

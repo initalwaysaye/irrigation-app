@@ -62,7 +62,7 @@ function Tile({ icon, iconBg, title, status, statusIcon, active, comingSoon, onC
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-3xl p-5 flex items-center gap-4 transition-all duration-200 active:scale-[0.98]
+      className={`w-full text-left rounded-3xl px-5 min-h-[96px] flex items-center gap-4 transition-all duration-200 active:scale-[0.98]
         bg-slate-800/70 border backdrop-blur
         ${active ? 'border-cyan-500/40 glow-active' : 'border-slate-700/60 hover:border-slate-600'}
         ${comingSoon ? 'opacity-70' : ''}`}
@@ -75,9 +75,9 @@ function Tile({ icon, iconBg, title, status, statusIcon, active, comingSoon, onC
       {/* Title + status */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-gray-100">{title}</h2>
+          <h2 className="font-semibold text-gray-100 truncate">{title}</h2>
           {comingSoon && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-700/80 text-slate-400 text-[10px] font-semibold uppercase tracking-wide">
+            <span className="inline-flex items-center justify-center leading-none whitespace-nowrap px-2 py-1 rounded-full bg-slate-700/80 text-slate-400 text-[10px] font-semibold uppercase tracking-wide">
               Coming soon
             </span>
           )}
