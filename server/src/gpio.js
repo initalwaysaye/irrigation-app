@@ -39,7 +39,8 @@ function init() {
     // Use BCM (GPIO) pin numbering rather than physical header numbering.
     // gpiomem: true uses /dev/gpiomem which is accessible to the gpio group without sudo.
     rpio.init({ mapping: 'gpio', gpiomem: true });
-    const offValue = config.activeHigh ? rpio.HIGH : rpio.LOW;
+    // "Off" is the relay's de-energised level: HIGH for active-LOW boards.
+    const offValue = config.activeHigh ? rpio.LOW : rpio.HIGH;
     for (const zone of config.zones) {
       rpio.open(zone.pin, rpio.OUTPUT, offValue);
     }
@@ -81,7 +82,7 @@ function setZone(pin, on) {
 function cleanup() {
   if (MOCK) return;
   const rpio = require('rpio');
-  const offValue = config.activeHigh ? rpio.HIGH : rpio.LOW;
+  const offValue = config.activeHigh ? rpio.LOW : rpio.HIGH;
   for (const zone of config.zones) {
     rpio.write(zone.pin, offValue);
     rpio.close(zone.pin);
