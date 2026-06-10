@@ -27,6 +27,29 @@ body {
   animation: screen-enter 0.25s ease-out;
 }
 
+/* iOS Safari fixes for native time/number inputs.
+   Without appearance:none, iOS ignores height/padding/width on these inputs,
+   which made the Start time and Duration fields overlap at different heights.
+   The ::-webkit-date-and-time-value rule stops the time value collapsing the
+   input's height and left-aligns it like a normal text field. */
+input[type='time'],
+input[type='number'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='time'] {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+input[type='time']::-webkit-date-and-time-value {
+  text-align: left;
+  height: 1.25rem;
+  margin: 0;
+}
+
 /* Soft breathing glow for active tiles. */
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 24px 0 rgba(34, 211, 238, 0.18); }
