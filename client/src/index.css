@@ -59,3 +59,21 @@ input[type='time']::-webkit-date-and-time-value {
 .glow-active {
   animation: glow-pulse 2.5s ease-in-out infinite;
 }
+
+/* Staggered entrance for landing-page cards: fade in while rising.
+   Each card sets its own animation-delay inline; the card starts invisible
+   (animation-fill-mode: both) so it doesn't flash before its turn. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
