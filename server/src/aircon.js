@@ -188,7 +188,10 @@ async function getStatus() {
     };
   }
 
-  const commissioned = Boolean(controller?.isCommissioned());
+  // isCommissioned() throws if the controller exists but start() hasn't
+  // finished yet — treat that window as "not ready" rather than crashing.
+  let commissioned = false;
+  try { commissioned = Boolean(controller?.isCommissioned()); } catch { /* still starting */ }
   const online = Boolean(node?.isConnected);
   const base = {
     available: initialized && !initError, commissioned, online,

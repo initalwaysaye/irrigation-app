@@ -16,7 +16,11 @@ const router = express.Router();
 const neohub = require('../neohub');
 
 router.get('/status', async (req, res) => {
-  res.json(await neohub.getStatus());
+  try {
+    res.json(await neohub.getStatus());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Tests against the live hub before saving, so a typo'd IP or bad token comes

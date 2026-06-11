@@ -86,3 +86,10 @@ function shutdown() {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+// Safety net: a stray rejected promise (e.g. an async route handler or a
+// Matter/NeoHub background task failing) must never take down the whole
+// controller — log it and keep running. Valves and heating depend on us.
+process.on('unhandledRejection', (err) => {
+  console.error('[Server] Unhandled rejection:', err?.message ?? err);
+});

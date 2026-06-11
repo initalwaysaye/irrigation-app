@@ -34,7 +34,13 @@ function act(fn) {
 }
 
 router.get('/status', async (req, res) => {
-  res.json(await aircon.getStatus());
+  try {
+    res.json(await aircon.getStatus());
+  } catch (err) {
+    // Never let a status read crash the process (async route errors are
+    // fatal in Express 4 otherwise).
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Commissioning can take 10-30s while the device is discovered over mDNS.
