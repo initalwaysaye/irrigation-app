@@ -1,54 +1,73 @@
 /**
  * gpio.js
- * GPIO control using the rpio package, which memory-maps /dev/gpiomem directly.
- * Works on Pi 1/2/3/4/5 without needing a daemon or the sysfs interface.
+ * GPIO control with a backend per Pi generation:
+ *
+ *   - Pi 1-4:  the rpio package, which memory-maps /dev/gpiomem directly.
+ *   - Pi 5:    the official `pinctrl` tool (shelled out). The Pi 5's GPIO
+ *              lives on the new RP1 chip, which rpio's BCM283x register
+ *              mapping cannot address.
+ *   - Mock:    anything that isn't a Pi, MOCK_GPIO=true, or hardware init
+ *              failure — logs instead of touching hardware.
+ *
  * Requires the user to be in the 'gpio' group (standard on Raspberry Pi OS).
  */
 
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const config = require('./config');
 
-let MOCK = process.env.MOCK_GPIO === 'true' || !isRaspberryPi();
-
-/**
- * Detects whether this process is running on a Raspberry Pi by checking
- * /proc/cpuinfo, which on a Pi contains "Raspberry Pi" or the chip name "BCM".
- * Returns false on any OS that doesn't have that file (macOS, Windows, etc.).
- */
-function isRaspberryPi() {
+/** Reads the device model string, e.g. "Raspberry Pi 5 Model B Rev 1.0". */
+function piModel() {
   try {
-    const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
-    return /Raspberry Pi|BCM/.test(cpuinfo);
+    return fs.readFileSync('/proc/device-tree/model', 'utf8');
   } catch {
-    return false;
+    try {
+      const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
+      return /Raspberry Pi|BCM/.test(cpuinfo) ? 'Raspberry Pi (unknown model)' : '';
+    } catch {
+      return '';
+    }
   }
+}
+
+// Pick the backend once at module load. init() may downgrade to mock on failure.
+let BACKEND = 'mock';
+if (process.env.MOCK_GPIO !== 'true') {
+  const model = piModel();
+  if (/Raspberry Pi 5/.test(model)) BACKEND = 'pinctrl';
+  else if (model) BACKEND = 'rpio';
+}
+
+/** Drives a pin via the Raspberry Pi pinctrl tool: output + drive high/low. */
+function pinctrlSet(pin, high) {
+  execFileSync('pinctrl', ['set', String(pin), 'op', high ? 'dh' : 'dl']);
 }
 
 /**
  * Initialises all GPIO pins as outputs and drives them to the "off" state.
- * Uses rpio which memory-maps /dev/gpiomem directly — no sysfs, no daemon needed.
- * Falls back to mock mode if initialisation fails (e.g. wrong group membership).
+ * Falls back to mock mode if initialisation fails so the server still starts.
  */
 function init() {
-  if (MOCK) {
-    console.log('[GPIO] Mock mode — no hardware access');
-    return;
-  }
+  // "Off" is the relay's de-energised level: HIGH for active-LOW boards.
+  const offHigh = !config.activeHigh;
   try {
-    const rpio = require('rpio');
-    // Use BCM (GPIO) pin numbering rather than physical header numbering.
-    // gpiomem: true uses /dev/gpiomem which is accessible to the gpio group without sudo.
-    rpio.init({ mapping: 'gpio', gpiomem: true });
-    // "Off" is the relay's de-energised level: HIGH for active-LOW boards.
-    const offValue = config.activeHigh ? rpio.LOW : rpio.HIGH;
-    for (const zone of config.zones) {
-      rpio.open(zone.pin, rpio.OUTPUT, offValue);
+    if (BACKEND === 'pinctrl') {
+      for (const zone of config.zones) pinctrlSet(zone.pin, offHigh);
+      console.log('[GPIO] Initialized via pinctrl (Pi 5), all zones off');
+    } else if (BACKEND === 'rpio') {
+      const rpio = require('rpio');
+      // BCM (GPIO) numbering; gpiomem:true uses /dev/gpiomem which the gpio
+      // group can access without sudo.
+      rpio.init({ mapping: 'gpio', gpiomem: true });
+      for (const zone of config.zones) {
+        rpio.open(zone.pin, rpio.OUTPUT, offHigh ? rpio.HIGH : rpio.LOW);
+      }
+      console.log('[GPIO] Initialized via rpio, all zones off');
+    } else {
+      console.log('[GPIO] Mock mode — no hardware access');
     }
-    console.log('[GPIO] Initialized via rpio, all zones off');
   } catch (err) {
-    // Fall back to mock so the server still starts even if GPIO is unavailable.
-    // Fix: sudo usermod -aG gpio $USER then reboot.
-    MOCK = true;
+    BACKEND = 'mock';
     console.warn('[GPIO] Hardware init failed, falling back to mock mode.');
     console.warn('[GPIO] Make sure the user is in the gpio group: sudo usermod -aG gpio $USER');
     console.warn('[GPIO] Error was:', err.message);
@@ -66,13 +85,16 @@ function init() {
  *   HIGH signal (1) = relay coil de-energised = valve CLOSED
  */
 function setZone(pin, on) {
-  if (MOCK) {
+  // The electrical level to drive: invert for active-LOW boards.
+  const high = config.activeHigh ? on : !on;
+  if (BACKEND === 'pinctrl') {
+    pinctrlSet(pin, high);
+  } else if (BACKEND === 'rpio') {
+    const rpio = require('rpio');
+    rpio.write(pin, high ? rpio.HIGH : rpio.LOW);
+  } else {
     console.log(`[GPIO] Mock: pin ${pin} → ${on ? 'ON' : 'OFF'}`);
-    return;
   }
-  const rpio = require('rpio');
-  const value = config.activeHigh ? (on ? rpio.HIGH : rpio.LOW) : (on ? rpio.LOW : rpio.HIGH);
-  rpio.write(pin, value);
 }
 
 /**
@@ -80,12 +102,15 @@ function setZone(pin, on) {
  * Called on server shutdown to ensure valves don't stay open.
  */
 function cleanup() {
-  if (MOCK) return;
-  const rpio = require('rpio');
-  const offValue = config.activeHigh ? rpio.LOW : rpio.HIGH;
-  for (const zone of config.zones) {
-    rpio.write(zone.pin, offValue);
-    rpio.close(zone.pin);
+  const offHigh = !config.activeHigh;
+  if (BACKEND === 'pinctrl') {
+    for (const zone of config.zones) pinctrlSet(zone.pin, offHigh);
+  } else if (BACKEND === 'rpio') {
+    const rpio = require('rpio');
+    for (const zone of config.zones) {
+      rpio.write(zone.pin, offHigh ? rpio.HIGH : rpio.LOW);
+      rpio.close(zone.pin);
+    }
   }
 }
 

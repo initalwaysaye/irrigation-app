@@ -51,8 +51,9 @@ SQLite      GPIO (rpio)  node-cron     matter.js controller
 
 ## Setting up a fresh Raspberry Pi
 
-> Works on Pi 1–4 with Raspberry Pi OS. **Not Pi 5** (different GPIO chip —
-> the rpio-based GPIO layer would need replacing).
+> Works on Pi 1–5 with Raspberry Pi OS. The GPIO layer auto-selects its
+> backend: `rpio` (memory-mapped) on Pi 1–4, the official `pinctrl` tool on
+> Pi 5 (whose RP1 GPIO chip rpio can't address).
 
 ```bash
 git clone https://github.com/initalwaysaye/home-automation.git ~/home-automation
@@ -103,7 +104,8 @@ cd ~/home-automation && git pull && sudo systemctl restart home-automation
   the pins float during boot and *all valves open* until the service starts.
 - **rpio over onoff**: the `onoff` package uses sysfs GPIO numbering which is
   offset on newer kernels (gpiochip512); `rpio` memory-maps `/dev/gpiomem`
-  and just works (Pi 1–4).
+  and just works (Pi 1–4). On **Pi 5** neither works (new RP1 GPIO chip) —
+  the app shells out to the official `pinctrl` tool there instead.
 - **Matter pairing**: generate the pairing code in HomeCom Easy
   (AC → settings → Connectivity/Matter). Commissioning takes ~10–30s over
   mDNS; credentials persist in `server/data/matter/`.

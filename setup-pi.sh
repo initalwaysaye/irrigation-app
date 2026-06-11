@@ -18,9 +18,8 @@
 #   - systemd service (start on boot, restart on crash)
 #   - client build if client/dist wasn't copied over already
 #
-# NOTE: the GPIO layer uses the rpio package (memory-mapped /dev/gpiomem),
-# which supports Pi 1-4. A Pi 5 has a different GPIO chip (RP1) and would
-# need the GPIO layer swapped — don't use this on a Pi 5 without that change.
+# Supports Pi 1-5: the GPIO layer auto-selects rpio (Pi 1-4, memory-mapped
+# /dev/gpiomem) or the official pinctrl tool (Pi 5, RP1 GPIO chip).
 
 set -euo pipefail
 
