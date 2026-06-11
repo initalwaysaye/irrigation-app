@@ -69,8 +69,12 @@ async function init() {
     // matter.js logs at DEBUG by default, which would flood the Pi's journal.
     process.env.MATTER_LOG_LEVEL = process.env.MATTER_LOG_LEVEL || 'warn';
 
-    const { Environment } = require('@matter/main');
+    const { Environment, Logger, LogLevel } = require('@matter/main');
     const { CommissioningController } = require('@project-chip/matter.js');
+
+    // The env var alone doesn't reliably set the log level — set it directly
+    // so matter.js doesn't flood the journal with DEBUG output.
+    try { Logger.level = LogLevel.WARN; } catch { /* logger API moved — non-fatal */ }
 
     const environment = Environment.default;
 
