@@ -36,10 +36,11 @@ app.use(cors());
 // Parse incoming JSON request bodies so route handlers can access req.body.
 app.use(express.json());
 
-// Mount the API route handlers. All irrigation control logic lives here.
+// Mount the API route handlers.
 app.use('/api/zones', require('./routes/zones'));
 app.use('/api/schedules', require('./routes/schedules'));
 app.use('/api/system', require('./routes/system'));
+app.use('/api/aircon', require('./routes/aircon'));
 
 // Serve the compiled React app for any non-API request.
 // express.static serves files from client/dist/ (index.html, JS bundles, CSS).
@@ -60,6 +61,11 @@ scheduler.load();
 const server = app.listen(config.port, () =>
   console.log(`Irrigation server running on http://localhost:${config.port}`)
 );
+
+// Start the Matter controller for the aircon in the background — it can take
+// a few seconds and must never block or crash the rest of the app.
+const aircon = require('./aircon');
+aircon.init().catch(err => console.error('[Aircon] init error:', err.message));
 
 /**
  * Graceful shutdown handler.

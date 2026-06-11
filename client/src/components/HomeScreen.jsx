@@ -57,7 +57,22 @@ function sprinklerStatus(zones, schedules, rainDelayUntil, now) {
   return { text: 'All quiet', active: false };
 }
 
-export default function HomeScreen({ zones, schedules, rainDelayUntil, onOpen }) {
+/**
+ * Builds the aircon tile's status line from the /api/aircon/status payload.
+ * Modes display as e.g. "Cooling to 21°"; unpaired/offline states are called out.
+ */
+function airconTile(aircon) {
+  if (!aircon || !aircon.commissioned) {
+    return { statusText: 'Not paired yet', live: false, active: false };
+  }
+  if (!aircon.online) return { statusText: 'Offline', live: true, active: false };
+  if (!aircon.on) return { statusText: 'Off', live: true, active: false };
+  const verb = { cool: 'Cooling', heat: 'Heating', dry: 'Drying', fan: 'Fan', auto: 'Auto' }[aircon.mode] ?? 'On';
+  const target = aircon.targetTemp != null ? ` to ${aircon.targetTemp.toFixed(1)}°` : '';
+  return { statusText: `${verb}${target}`, live: true, active: true };
+}
+
+export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, onOpen }) {
   // Tick every second only while a zone is running, so the countdown is live.
   const anyOn = zones.some(z => z.isOn);
   const [now, setNow] = useState(Date.now());
@@ -155,28 +170,34 @@ export default function HomeScreen({ zones, schedules, rainDelayUntil, onOpen })
             {
               id: 'aircon', title: 'Aircon', Icon: Snowflake, delay: '160ms',
               iconCls: 'from-blue-500 to-indigo-600 shadow-blue-500/25',
+              ...airconTile(aircon),
             },
             {
               id: 'ufh', title: 'Heating', Icon: Flame, delay: '240ms',
               iconCls: 'from-amber-500 to-orange-600 shadow-amber-500/25',
+              statusText: 'Coming soon', live: false, active: false,
             },
-          ].map(({ id, title, Icon, delay, iconCls }) => (
+          ].map(({ id, title, Icon, delay, iconCls, statusText, live, active }) => (
             <button
               key={id}
               onClick={() => onOpen(id)}
               style={{ animationDelay: delay }}
-              className="rise text-left rounded-3xl p-5 transition-all duration-200 active:scale-[0.98]
-                bg-gradient-to-br from-slate-800/90 to-slate-800/40 border border-slate-700/60
-                hover:border-slate-500/60 opacity-90"
+              className={`rise text-left rounded-3xl p-5 transition-all duration-200 active:scale-[0.98]
+                bg-gradient-to-br from-slate-800/90 to-slate-800/40 border
+                hover:border-slate-500/60
+                ${active ? 'border-blue-500/40' : 'border-slate-700/60'}
+                ${live ? '' : 'opacity-90'}`}
             >
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4
                 bg-gradient-to-br ${iconCls} shadow-lg`}
               >
-                <Icon className="w-6 h-6 text-white" />
+                <Icon className={`w-6 h-6 text-white ${active ? 'animate-pulse' : ''}`} />
               </div>
               <h2 className="font-bold text-gray-100">{title}</h2>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mt-1">
-                Coming soon
+              <p className={`text-[10px] font-semibold uppercase tracking-wide mt-1 ${
+                active ? 'text-blue-400' : 'text-slate-500'
+              }`}>
+                {statusText}
               </p>
             </button>
           ))}

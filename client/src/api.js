@@ -116,3 +116,21 @@ export const saveSettings = (data) =>
 
 /** Fetches aggregated water usage and cost: { configured, periods }. */
 export const fetchUsage = () => req('/system/usage');
+
+// --- Aircon (Bosch 3200i via Matter) ---
+
+/** Fetches AC state: { commissioned, online, on, mode, targetTemp, roomTemp, fanMode }. */
+export const fetchAirconStatus = () => req('/aircon/status');
+
+/** Pairs the AC using a Matter pairing code from the HomeCom Easy app (slow: 10-30s). */
+export const commissionAircon = (pairingCode) =>
+  req('/aircon/commission', { method: 'POST', body: { pairingCode } });
+
+/** Unpairs the AC from this controller (it stays in HomeCom). */
+export const decommissionAircon = () =>
+  req('/aircon/commission', { method: 'DELETE' });
+
+export const setAirconPower = (on) => req('/aircon/power', { method: 'POST', body: { on } });
+export const setAirconMode = (mode) => req('/aircon/mode', { method: 'POST', body: { mode } });
+export const setAirconTemp = (target) => req('/aircon/temp', { method: 'POST', body: { target } });
+export const setAirconFan = (mode) => req('/aircon/fan', { method: 'POST', body: { mode } });

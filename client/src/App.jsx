@@ -17,10 +17,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import HomeScreen from './components/HomeScreen';
 import Sprinklers from './modules/Sprinklers';
+import Aircon from './modules/Aircon';
 import ComingSoon from './modules/ComingSoon';
-import { Snowflake, Flame } from './components/Icons';
+import { Flame } from './components/Icons';
 import {
-  fetchZones, fetchSchedules, fetchLog, fetchStatus,
+  fetchZones, fetchSchedules, fetchLog, fetchStatus, fetchAirconStatus,
   createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
   runAllZones, stopAllZones, setRainDelay, cancelRainDelay,
 } from './api';
@@ -31,6 +32,7 @@ export default function App() {
   const [schedules, setSchedules] = useState([]);
   const [log, setLog] = useState([]);
   const [rainDelayUntil, setRainDelayUntil] = useState(null);
+  const [aircon, setAircon] = useState(null); // null until first status fetch
 
   const loadZones = useCallback(() => fetchZones().then(setZones), []);
   const loadSchedules = useCallback(() => fetchSchedules().then(setSchedules), []);
@@ -38,15 +40,19 @@ export default function App() {
   const loadStatus = useCallback(
     () => fetchStatus().then(s => setRainDelayUntil(s.rainDelayUntil)), []
   );
+  const loadAircon = useCallback(
+    () => fetchAirconStatus().then(setAircon).catch(() => {}), []
+  );
 
   useEffect(() => {
     loadZones();
     loadSchedules();
     loadLog();
     loadStatus();
-    // Poll zones + status every 10s so scheduled runs and rain delay expiry
-    // appear on the landing tile and module screens without a refresh.
-    const id = setInterval(() => { loadZones(); loadStatus(); }, 10000);
+    loadAircon();
+    // Poll zones + system + aircon every 10s so scheduled runs, rain delay
+    // expiry, and AC state appear on the landing tiles without a refresh.
+    const id = setInterval(() => { loadZones(); loadStatus(); loadAircon(); }, 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -100,6 +106,7 @@ export default function App() {
             zones={zones}
             schedules={schedules}
             rainDelayUntil={rainDelayUntil}
+            aircon={aircon}
             onOpen={setView}
           />
         )}
@@ -124,11 +131,9 @@ export default function App() {
         )}
 
         {view === 'aircon' && (
-          <ComingSoon
-            title="Air Conditioning"
-            description="Climate control for the whole house — set temperatures, modes, and schedules once the AC integration is connected."
-            icon={<Snowflake className="w-10 h-10" />}
-            accent="blue"
+          <Aircon
+            status={aircon}
+            onStatusChange={setAircon}
             onBack={() => setView('home')}
           />
         )}
