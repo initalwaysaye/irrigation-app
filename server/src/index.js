@@ -41,6 +41,7 @@ app.use('/api/zones', require('./routes/zones'));
 app.use('/api/schedules', require('./routes/schedules'));
 app.use('/api/system', require('./routes/system'));
 app.use('/api/aircon', require('./routes/aircon'));
+app.use('/api/ufh', require('./routes/ufh'));
 
 // Serve the compiled React app for any non-API request.
 // express.static serves files from client/dist/ (index.html, JS bundles, CSS).

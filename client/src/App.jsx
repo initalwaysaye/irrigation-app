@@ -18,10 +18,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import HomeScreen from './components/HomeScreen';
 import Sprinklers from './modules/Sprinklers';
 import Aircon from './modules/Aircon';
-import ComingSoon from './modules/ComingSoon';
-import { Flame } from './components/Icons';
+import Ufh from './modules/Ufh';
 import {
-  fetchZones, fetchSchedules, fetchLog, fetchStatus, fetchAirconStatus,
+  fetchZones, fetchSchedules, fetchLog, fetchStatus, fetchAirconStatus, fetchUfhStatus,
   createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
   runAllZones, stopAllZones, setRainDelay, cancelRainDelay,
 } from './api';
@@ -33,6 +32,7 @@ export default function App() {
   const [log, setLog] = useState([]);
   const [rainDelayUntil, setRainDelayUntil] = useState(null);
   const [aircon, setAircon] = useState(null); // null until first status fetch
+  const [ufh, setUfh] = useState(null);       // null until first status fetch
 
   const loadZones = useCallback(() => fetchZones().then(setZones), []);
   const loadSchedules = useCallback(() => fetchSchedules().then(setSchedules), []);
@@ -43,6 +43,9 @@ export default function App() {
   const loadAircon = useCallback(
     () => fetchAirconStatus().then(setAircon).catch(() => {}), []
   );
+  const loadUfh = useCallback(
+    () => fetchUfhStatus().then(setUfh).catch(() => {}), []
+  );
 
   useEffect(() => {
     loadZones();
@@ -50,9 +53,10 @@ export default function App() {
     loadLog();
     loadStatus();
     loadAircon();
-    // Poll zones + system + aircon every 10s so scheduled runs, rain delay
-    // expiry, and AC state appear on the landing tiles without a refresh.
-    const id = setInterval(() => { loadZones(); loadStatus(); loadAircon(); }, 10000);
+    loadUfh();
+    // Poll zones + system + aircon + ufh every 10s so scheduled runs, rain
+    // delay expiry, AC and heating state appear on the tiles without a refresh.
+    const id = setInterval(() => { loadZones(); loadStatus(); loadAircon(); loadUfh(); }, 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -107,6 +111,7 @@ export default function App() {
             schedules={schedules}
             rainDelayUntil={rainDelayUntil}
             aircon={aircon}
+            ufh={ufh}
             onOpen={setView}
           />
         )}
@@ -139,11 +144,9 @@ export default function App() {
         )}
 
         {view === 'ufh' && (
-          <ComingSoon
-            title="Underfloor Heating"
-            description="Warm floors on demand — room-by-room temperature control and heating schedules once the UFH integration is connected."
-            icon={<Flame className="w-10 h-10" />}
-            accent="amber"
+          <Ufh
+            status={ufh}
+            onStatusChange={setUfh}
             onBack={() => setView('home')}
           />
         )}

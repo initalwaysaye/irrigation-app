@@ -134,3 +134,27 @@ export const setAirconPower = (on) => req('/aircon/power', { method: 'POST', bod
 export const setAirconMode = (mode) => req('/aircon/mode', { method: 'POST', body: { mode } });
 export const setAirconTemp = (target) => req('/aircon/temp', { method: 'POST', body: { target } });
 export const setAirconFan = (mode) => req('/aircon/fan', { method: 'POST', body: { mode } });
+
+// --- Underfloor heating (Heatmiser NeoHub) ---
+
+/** Fetches UFH state: { configured, online, rooms: [{name, currentTemp, ...}] }. */
+export const fetchUfhStatus = () => req('/ufh/status');
+
+/** Connects to the NeoHub (tests first, saves on success). Throws-ish via error field. */
+export const setupUfh = async (host, token) => {
+  const res = await fetch('/api/ufh/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ host, token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Connection failed');
+  return data;
+};
+
+/** Forgets the NeoHub configuration. */
+export const clearUfh = () => req('/ufh/setup', { method: 'DELETE' });
+
+/** Sets a room's target temperature. */
+export const setUfhTarget = (room, target) =>
+  req('/ufh/room/temp', { method: 'POST', body: { room, target } });

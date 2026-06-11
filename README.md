@@ -9,7 +9,7 @@ web UI served on the local network — no cloud accounts, no subscriptions.
 |---|---|---|
 | **Sprinklers** | Live | 3 irrigation zones via GPIO relay board (active-LOW, BCM pins 17/27/22) |
 | **Air Conditioning** | Live | Bosch Climate 3200i controlled locally over **Matter** (matter.js controller) |
-| **Underfloor Heating** | Planned | Placeholder screen |
+| **Underfloor Heating** | Live | Heatmiser NeoHub/NeoStats via the hub's **local API** (websocket + token, or legacy TCP) |
 
 ### Sprinklers
 - Manual control per zone with timed auto-off and live countdown
@@ -29,6 +29,12 @@ web UI served on the local network — no cloud accounts, no subscriptions.
 - Power, mode (auto/cool/heat/dry/fan), target temperature, fan speed, room temp
 - Note: the HomeCom *cloud* API was a dead end — it doesn't support
   Midea-based units like the 3200i; Matter is the supported path
+
+### Underfloor heating (Heatmiser NeoHub + NeoStats)
+- Connects to the NeoHub's local API — websocket on :4243 with a token
+  generated in the neoApp (Settings → API), or legacy TCP :4242 tokenless
+- Rooms auto-discovered; per-room current temp, target adjust, heating
+  indicator; NeoStats keep their own onboard schedules
 
 ## Architecture
 

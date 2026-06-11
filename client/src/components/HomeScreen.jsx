@@ -72,7 +72,26 @@ function airconTile(aircon) {
   return { statusText: `${verb}${target}`, live: true, active: true };
 }
 
-export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, onOpen }) {
+/**
+ * Builds the heating tile's status line from the /api/ufh/status payload.
+ * Shows how many rooms are actively calling for heat, or the average temp.
+ */
+function ufhTile(ufh) {
+  if (!ufh || !ufh.configured) {
+    return { statusText: 'Not connected yet', live: false, active: false };
+  }
+  if (!ufh.online) return { statusText: 'Offline', live: true, active: false };
+  const heating = ufh.rooms.filter(r => r.heating).length;
+  if (heating > 0) {
+    return {
+      statusText: `Heating ${heating} room${heating > 1 ? 's' : ''}`,
+      live: true, active: true,
+    };
+  }
+  return { statusText: 'All rooms at target', live: true, active: false };
+}
+
+export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, ufh, onOpen }) {
   // Tick every second only while a zone is running, so the countdown is live.
   const anyOn = zones.some(z => z.isOn);
   const [now, setNow] = useState(Date.now());
@@ -164,20 +183,22 @@ export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, o
           </div>
         </button>
 
-        {/* Coming-soon modules — side by side */}
+        {/* Climate modules — side by side, each with its own accent colour */}
         <div className="grid grid-cols-2 gap-4">
           {[
             {
               id: 'aircon', title: 'Aircon', Icon: Snowflake, delay: '160ms',
               iconCls: 'from-blue-500 to-indigo-600 shadow-blue-500/25',
+              activeBorder: 'border-blue-500/40', activeText: 'text-blue-400',
               ...airconTile(aircon),
             },
             {
               id: 'ufh', title: 'Heating', Icon: Flame, delay: '240ms',
               iconCls: 'from-amber-500 to-orange-600 shadow-amber-500/25',
-              statusText: 'Coming soon', live: false, active: false,
+              activeBorder: 'border-amber-500/40', activeText: 'text-amber-400',
+              ...ufhTile(ufh),
             },
-          ].map(({ id, title, Icon, delay, iconCls, statusText, live, active }) => (
+          ].map(({ id, title, Icon, delay, iconCls, activeBorder, activeText, statusText, live, active }) => (
             <button
               key={id}
               onClick={() => onOpen(id)}
@@ -185,7 +206,7 @@ export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, o
               className={`rise text-left rounded-3xl p-5 transition-all duration-200 active:scale-[0.98]
                 bg-gradient-to-br from-slate-800/90 to-slate-800/40 border
                 hover:border-slate-500/60
-                ${active ? 'border-blue-500/40' : 'border-slate-700/60'}
+                ${active ? activeBorder : 'border-slate-700/60'}
                 ${live ? '' : 'opacity-90'}`}
             >
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4
@@ -195,7 +216,7 @@ export default function HomeScreen({ zones, schedules, rainDelayUntil, aircon, o
               </div>
               <h2 className="font-bold text-gray-100">{title}</h2>
               <p className={`text-[10px] font-semibold uppercase tracking-wide mt-1 ${
-                active ? 'text-blue-400' : 'text-slate-500'
+                active ? activeText : 'text-slate-500'
               }`}>
                 {statusText}
               </p>
